@@ -1,6 +1,7 @@
 import hashlib
 import json
 import logging
+import time
 from typing import Any, Dict, List, Optional
 
 import redis
@@ -10,19 +11,33 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 _redis_client: Optional[redis.Redis] = None
+_redis_available: bool = True
+_last_redis_failure: float = 0.0
+REDIS_RETRY_INTERVAL: float = 10.0
 
 
 def get_redis_client() -> Optional[redis.Redis]:
     """Return a singleton Redis client instance or None if unreachable."""
-    global _redis_client
+    global _redis_client, _redis_available, _last_redis_failure
+
+    if not _redis_available and (time.time() - _last_redis_failure < REDIS_RETRY_INTERVAL):
+        return None
+
     if _redis_client is None:
         try:
-            _redis_client = redis.Redis.from_url(
-                settings.REDIS_URL, decode_responses=True, socket_timeout=2.0
+            client = redis.Redis.from_url(
+                settings.REDIS_URL,
+                decode_responses=True,
+                socket_timeout=1.0,
+                socket_connect_timeout=1.0,
             )
-            _redis_client.ping()
+            client.ping()
+            _redis_client = client
+            _redis_available = True
         except Exception as e:
-            logger.warning("Redis is not available at %s: %s", settings.REDIS_URL, str(e))
+            _redis_available = False
+            _last_redis_failure = time.time()
+            logger.warning("Redis is not available at %s (%s). Operating in fallback mode.", settings.REDIS_URL, type(e).__name__)
             return None
     return _redis_client
 
