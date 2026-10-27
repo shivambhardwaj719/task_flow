@@ -13,7 +13,7 @@ def get_engine():
     db_url = settings.get_effective_database_url()
     if settings.ENVIRONMENT == "testing":
         return create_engine(
-            "sqlite:///:memory:",
+            db_url,
             connect_args={"check_same_thread": False}
         )
 

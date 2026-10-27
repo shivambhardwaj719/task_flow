@@ -13,7 +13,7 @@ import fakeredis
 from app.database import Base, get_db
 from app.main import app
 from app.core.security import hash_password, create_access_token
-from app.models.user import User
+from app.models import User, Project, Task, Notification
 from app.workers.celery_app import celery_app
 
 celery_app.conf.update(
@@ -23,13 +23,12 @@ celery_app.conf.update(
     task_eager_propagates=True,
 )
 
-# In-memory SQLite engine for tests with StaticPool so all threads share same memory
-TEST_DATABASE_URL = "sqlite:///:memory:"
+# Shared SQLite file for tests so FastAPI routes and worker tasks share the same state
+TEST_DATABASE_URL = "sqlite:///./test_taskflow.db"
 
 test_engine = create_engine(
     TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool
+    connect_args={"check_same_thread": False}
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
