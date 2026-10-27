@@ -1,0 +1,119 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taskflow_web
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=False
+      - SECRET_KEY=taskflow-super-secret-key-change-in-production-min32chars
+      - DATABASE_URL=postgresql://taskflow:taskflow_password@db:5432/taskflow_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - CACHE_DEFAULT_TTL=300
+      - OVERDUE_TASK_CHECK_INTERVAL_SECONDS=60
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - taskflow_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taskflow_worker
+    restart: unless-stopped
+    command: ["celery", "-A", "app.workers.celery_app.celery_app", "worker", "--loglevel=info", "-c", "2"]
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://taskflow:taskflow_password@db:5432/taskflow_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - taskflow_net
+
+  beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taskflow_beat
+    restart: unless-stopped
+    command: ["celery", "-A", "app.workers.celery_app.celery_app", "beat", "--loglevel=info"]
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://taskflow:taskflow_password@db:5432/taskflow_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - OVERDUE_TASK_CHECK_INTERVAL_SECONDS=60
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - taskflow_net
+
+  db:
+    image: postgres:16-alpine
+    container_name: taskflow_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: taskflow
+      POSTGRES_PASSWORD: taskflow_password
+      POSTGRES_DB: taskflow_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - taskflow_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taskflow -d taskflow_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: taskflow_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    networks:
+      - taskflow_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+networks:
+  taskflow_net:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redisdata:
