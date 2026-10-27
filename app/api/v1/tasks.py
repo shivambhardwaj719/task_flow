@@ -73,12 +73,27 @@ def get_task_with_authorization(task_id: int, user_id: int, db: Session, require
     return task
 
 
+def parse_datetime_query(val: Optional[str]) -> Optional[datetime]:
+    if not val:
+        return None
+    try:
+        cleaned = val.replace(" ", "+")
+        if cleaned.endswith("Z"):
+            cleaned = cleaned[:-1] + "+00:00"
+        return datetime.fromisoformat(cleaned)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid ISO datetime format: {val}"
+        )
+
+
 @router.get("/tasks", response_model=PaginatedTasks)
 def search_and_filter_tasks(
     status_filter: Optional[TaskStatus] = Query(None, alias="status", description="Filter by status: todo, in_progress, done"),
     assignee_id: Optional[int] = Query(None, description="Filter by assignee user ID"),
-    due_date_from: Optional[datetime] = Query(None, description="Filter tasks due on or after this UTC timestamp"),
-    due_date_to: Optional[datetime] = Query(None, description="Filter tasks due on or before this UTC timestamp"),
+    due_date_from: Optional[str] = Query(None, description="Filter tasks due on or after this UTC timestamp (ISO 8601)"),
+    due_date_to: Optional[str] = Query(None, description="Filter tasks due on or before this UTC timestamp (ISO 8601)"),
     project_id: Optional[int] = Query(None, description="Filter by project ID"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(10, ge=1, le=100, description="Page size"),
@@ -89,12 +104,15 @@ def search_and_filter_tasks(
     
     Stale reads are mathematically prevented through versioned cache keys.
     """
+    dt_from = parse_datetime_query(due_date_from)
+    dt_to = parse_datetime_query(due_date_to)
+
     # Build deterministic cache query parameters
     cache_params = {
         "status": status_filter.value if status_filter else None,
         "assignee_id": assignee_id,
-        "due_date_from": due_date_from.isoformat() if due_date_from else None,
-        "due_date_to": due_date_to.isoformat() if due_date_to else None,
+        "due_date_from": dt_from.isoformat() if dt_from else None,
+        "due_date_to": dt_to.isoformat() if dt_to else None,
         "project_id": project_id,
         "page": page,
         "page_size": page_size,
@@ -106,7 +124,7 @@ def search_and_filter_tasks(
         return cached_result
 
     # Base query: user can view tasks in projects they own OR tasks assigned to them
-    user_project_ids = db.query(Project.id).filter(Project.owner_id == current_user.id).subquery()
+    user_project_ids = db.query(Project.id).filter(Project.owner_id == current_user.id).scalar_subquery()
     query = db.query(Task).filter(
         or_(
             Task.project_id.in_(user_project_ids),
