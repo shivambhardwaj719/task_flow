@@ -1,20 +1,26 @@
-from datetime import datetime, timezone, timedelta
-import pytest
-from app.models.task import Task, TaskStatus
+from datetime import datetime, timedelta, timezone
+
 from app.models.notification import Notification, NotificationType
+from app.models.task import Task
 from app.workers.tasks import check_and_notify_overdue_tasks
 
 
 def test_reassignment_notification_trigger(client, auth_headers, auth_headers_user_2, test_user_2):
     # User 1 creates project & task
-    p = client.post("/api/v1/projects", json={"name": "Reassignment Proj"}, headers=auth_headers).json()
+    p = client.post(
+        "/api/v1/projects", json={"name": "Reassignment Proj"}, headers=auth_headers
+    ).json()
     project_id = p["id"]
 
-    t = client.post(f"/api/v1/projects/{project_id}/tasks", json={"title": "Urgent Task"}, headers=auth_headers).json()
+    t = client.post(
+        f"/api/v1/projects/{project_id}/tasks", json={"title": "Urgent Task"}, headers=auth_headers
+    ).json()
     task_id = t["id"]
 
     # Assign to User 2
-    client.patch(f"/api/v1/tasks/{task_id}", json={"assignee_id": test_user_2.id}, headers=auth_headers)
+    client.patch(
+        f"/api/v1/tasks/{task_id}", json={"assignee_id": test_user_2.id}, headers=auth_headers
+    )
 
     # User 2 checks notifications
     res_notif = client.get("/api/v1/notifications", headers=auth_headers_user_2)
@@ -30,7 +36,9 @@ def test_reassignment_notification_trigger(client, auth_headers, auth_headers_us
 
 def test_overdue_tasks_background_job(client, auth_headers, test_user, db_session):
     # Create project
-    p = client.post("/api/v1/projects", json={"name": "Overdue Inspection Project"}, headers=auth_headers).json()
+    p = client.post(
+        "/api/v1/projects", json={"name": "Overdue Inspection Project"}, headers=auth_headers
+    ).json()
     project_id = p["id"]
 
     now = datetime.now(timezone.utc)
@@ -40,22 +48,27 @@ def test_overdue_tasks_background_job(client, auth_headers, test_user, db_sessio
     # 1. Overdue & TODO -> Should notify
     t1 = client.post(
         f"/api/v1/projects/{project_id}/tasks",
-        json={"title": "Overdue Task", "due_date": past_due.isoformat(), "status": "todo", "assignee_id": test_user.id},
-        headers=auth_headers
+        json={
+            "title": "Overdue Task",
+            "due_date": past_due.isoformat(),
+            "status": "todo",
+            "assignee_id": test_user.id,
+        },
+        headers=auth_headers,
     ).json()
 
     # 2. Overdue & DONE -> Should NOT notify
-    t2 = client.post(
+    client.post(
         f"/api/v1/projects/{project_id}/tasks",
         json={"title": "Done Task", "due_date": past_due.isoformat(), "status": "done"},
-        headers=auth_headers
+        headers=auth_headers,
     ).json()
 
     # 3. Future & TODO -> Should NOT notify
-    t3 = client.post(
+    client.post(
         f"/api/v1/projects/{project_id}/tasks",
         json={"title": "Future Task", "due_date": future_due.isoformat(), "status": "todo"},
-        headers=auth_headers
+        headers=auth_headers,
     ).json()
 
     # Clear any previous notifications for clean test
@@ -85,14 +98,16 @@ def test_overdue_tasks_background_job(client, auth_headers, test_user, db_sessio
     assert len(notifs_after) == 1
 
 
-def test_notifications_mark_read_and_authorization(client, auth_headers, auth_headers_user_2, test_user, test_user_2, db_session):
+def test_notifications_mark_read_and_authorization(
+    client, auth_headers, auth_headers_user_2, test_user, test_user_2, db_session
+):
     # Create notification for User 1
     notif = Notification(
         user_id=test_user.id,
         notification_type="task_alert",
         title="Alert 1",
         message="Important alert message",
-        is_read=False
+        is_read=False,
     )
     db_session.add(notif)
     db_session.commit()
@@ -102,15 +117,13 @@ def test_notifications_mark_read_and_authorization(client, auth_headers, auth_he
     res_forbidden = client.patch(
         f"/api/v1/notifications/{notif.id}/read",
         json={"is_read": True},
-        headers=auth_headers_user_2
+        headers=auth_headers_user_2,
     )
     assert res_forbidden.status_code == 403
 
     # User 1 marks it as read -> 200 OK
     res_ok = client.patch(
-        f"/api/v1/notifications/{notif.id}/read",
-        json={"is_read": True},
-        headers=auth_headers
+        f"/api/v1/notifications/{notif.id}/read", json={"is_read": True}, headers=auth_headers
     )
     assert res_ok.status_code == 200
     assert res_ok.json()["is_read"] is True

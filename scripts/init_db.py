@@ -1,7 +1,9 @@
 """Database initialization script to create all tables."""
+
 import logging
+
 from app.database import Base, engine
-from app.models import User, Project, Task, Notification  # noqa: F401
+from app.models import Notification, Project, Task, User  # noqa: F401
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

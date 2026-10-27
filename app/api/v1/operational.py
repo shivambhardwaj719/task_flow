@@ -1,13 +1,14 @@
 import time
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, Response, status
-from sqlalchemy.orm import Session
-from sqlalchemy import text
 
-from app.database import get_db
+from fastapi import APIRouter, Depends, Response, status
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
 from app.config import settings
 from app.core.cache import get_redis_client
 from app.core.metrics import get_metrics_response
+from app.database import get_db
 
 router = APIRouter(tags=["Operational"])
 
@@ -23,16 +24,10 @@ def health_check(response: Response, db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))
         db_latency = round((time.time() - db_start) * 1000, 2)
-        components["database"] = {
-            "status": "connected",
-            "latency_ms": db_latency
-        }
+        components["database"] = {"status": "connected", "latency_ms": db_latency}
     except Exception as e:
         is_healthy = False
-        components["database"] = {
-            "status": "error",
-            "error": str(e)
-        }
+        components["database"] = {"status": "error", "error": str(e)}
 
     # 2. Redis Check
     redis_start = time.time()
@@ -40,20 +35,14 @@ def health_check(response: Response, db: Session = Depends(get_db)):
         r = get_redis_client()
         if r and r.ping():
             redis_latency = round((time.time() - redis_start) * 1000, 2)
-            components["redis"] = {
-                "status": "connected",
-                "latency_ms": redis_latency
-            }
+            components["redis"] = {"status": "connected", "latency_ms": redis_latency}
         else:
             components["redis"] = {
                 "status": "degraded",
-                "detail": "Redis ping returned falsy or client not configured"
+                "detail": "Redis ping returned falsy or client not configured",
             }
     except Exception as e:
-        components["redis"] = {
-            "status": "degraded",
-            "error": str(e)
-        }
+        components["redis"] = {"status": "degraded", "error": str(e)}
 
     overall_status = "healthy" if is_healthy else "unhealthy"
     if not is_healthy:
@@ -65,7 +54,7 @@ def health_check(response: Response, db: Session = Depends(get_db)):
         "version": settings.VERSION,
         "environment": settings.ENVIRONMENT,
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "components": components
+        "components": components,
     }
 
 

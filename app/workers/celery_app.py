@@ -1,11 +1,12 @@
 from celery import Celery
+
 from app.config import settings
 
 celery_app = Celery(
     "taskflow",
     broker=settings.get_celery_broker_url(),
     backend=settings.get_celery_result_backend(),
-    include=["app.workers.tasks"]
+    include=["app.workers.tasks"],
 )
 
 celery_app.conf.update(
@@ -22,7 +23,7 @@ celery_app.conf.update(
             "task": "app.workers.tasks.check_and_notify_overdue_tasks",
             "schedule": float(settings.OVERDUE_TASK_CHECK_INTERVAL_SECONDS),
         },
-    }
+    },
 )
 
 if settings.ENVIRONMENT == "testing":

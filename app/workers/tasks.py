@@ -1,14 +1,16 @@
 import logging
 from datetime import datetime, timezone
 from typing import Optional
+
 from sqlalchemy.orm import Session
-from app.workers.celery_app import celery_app
-from app.database import SessionLocal
+
 from app.config import settings
-from app.models.task import Task, TaskStatus
-from app.models.project import Project
-from app.models.user import User
+from app.database import SessionLocal
 from app.models.notification import Notification, NotificationType
+from app.models.project import Project
+from app.models.task import Task, TaskStatus
+from app.models.user import User
+from app.workers.celery_app import celery_app
 
 logger = logging.getLogger("taskflow.worker")
 
@@ -18,6 +20,7 @@ def get_worker_db():
     if settings.ENVIRONMENT == "testing":
         try:
             from tests.conftest import TestingSessionLocal
+
             return TestingSessionLocal()
         except ImportError:
             pass
@@ -41,10 +44,7 @@ def simulate_delivery(channel: str, recipient: str, title: str, message: str) ->
 
 @celery_app.task(name="app.workers.tasks.notify_task_reassigned")
 def notify_task_reassigned(
-    task_id: int,
-    old_assignee_id: Optional[int],
-    new_assignee_id: Optional[int],
-    actor_id: int
+    task_id: int, old_assignee_id: Optional[int], new_assignee_id: Optional[int], actor_id: int
 ) -> dict:
     """Background task to record and dispatch reassignment notifications."""
     db: Session = get_worker_db()
@@ -68,7 +68,7 @@ def notify_task_reassigned(
                     task_id=task.id,
                     notification_type=NotificationType.TASK_REASSIGNED.value,
                     title=title,
-                    message=body
+                    message=body,
                 )
                 db.add(notification)
                 simulate_delivery("email", new_assignee.email, title, body)
@@ -84,7 +84,7 @@ def notify_task_reassigned(
                     task_id=task.id,
                     notification_type=NotificationType.TASK_REASSIGNED.value,
                     title=title,
-                    message=body
+                    message=body,
                 )
                 db.add(notification)
                 simulate_delivery("email", old_assignee.email, title, body)
@@ -101,10 +101,7 @@ def notify_task_reassigned(
 
 @celery_app.task(name="app.workers.tasks.notify_task_status_changed")
 def notify_task_status_changed(
-    task_id: int,
-    old_status: str,
-    new_status: str,
-    actor_id: int
+    task_id: int, old_status: str, new_status: str, actor_id: int
 ) -> dict:
     """Background task to record and dispatch status change notifications."""
     db: Session = get_worker_db()
@@ -135,13 +132,17 @@ def notify_task_status_changed(
                     task_id=task.id,
                     notification_type=NotificationType.TASK_STATUS_CHANGED.value,
                     title=title,
-                    message=body
+                    message=body,
                 )
                 db.add(notification)
                 simulate_delivery("email", recipient.email, title, body)
 
         db.commit()
-        return {"status": "success", "task_id": task_id, "recipients_notified": len(recipients_to_notify)}
+        return {
+            "status": "success",
+            "task_id": task_id,
+            "recipients_notified": len(recipients_to_notify),
+        }
     except Exception as e:
         db.rollback()
         logger.error("Error creating status change notification: %s", str(e))
@@ -163,7 +164,7 @@ def check_and_notify_overdue_tasks() -> dict:
                 Task.due_date.isnot(None),
                 Task.due_date < now,
                 Task.status != TaskStatus.DONE.value,
-                Task.is_overdue_notified.is_(False)
+                Task.is_overdue_notified.is_(False),
             )
             .all()
         )
@@ -180,7 +181,9 @@ def check_and_notify_overdue_tasks() -> dict:
             if recipient_id:
                 recipient = db.query(User).filter(User.id == recipient_id).first()
                 if recipient:
-                    due_date_str = task.due_date.strftime("%Y-%m-%d %H:%M UTC") if task.due_date else "N/A"
+                    due_date_str = (
+                        task.due_date.strftime("%Y-%m-%d %H:%M UTC") if task.due_date else "N/A"
+                    )
                     title = f"Task Overdue: {task.title}"
                     body = f"Task '{task.title}' is overdue! The due date was {due_date_str} and it has not been marked as done."
                     notification = Notification(
@@ -188,7 +191,7 @@ def check_and_notify_overdue_tasks() -> dict:
                         task_id=task.id,
                         notification_type=NotificationType.TASK_OVERDUE.value,
                         title=title,
-                        message=body
+                        message=body,
                     )
                     db.add(notification)
                     simulate_delivery("email", recipient.email, title, body)

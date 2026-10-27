@@ -1,11 +1,12 @@
 from typing import Optional
+
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.core.security import decode_access_token
 from app.database import get_db
 from app.models.user import User
-from app.core.security import decode_access_token
 
 # Use HTTPBearer for clean Swagger Authorization header documentation
 security = HTTPBearer(auto_error=False)
@@ -13,10 +14,10 @@ security = HTTPBearer(auto_error=False)
 
 def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> User:
     """Dependency that extracts, verifies the JWT Bearer token, and returns the current authenticated User.
-    
+
     Raises 401 Unauthorized if token is missing, invalid, or expired.
     """
     if not credentials or not credentials.credentials:
@@ -61,9 +62,6 @@ def get_current_user(
         )
 
     if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Inactive user account"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user account")
 
     return user

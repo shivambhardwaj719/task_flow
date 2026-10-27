@@ -1,10 +1,7 @@
-import pytest
-
-
 def test_create_project(client, auth_headers):
     payload = {
         "name": "Backend Engineering Project",
-        "description": "Production-ready TaskFlow API"
+        "description": "Production-ready TaskFlow API",
     }
     response = client.post("/api/v1/projects", json=payload, headers=auth_headers)
     assert response.status_code == 201
@@ -18,7 +15,7 @@ def test_create_project(client, auth_headers):
 def test_list_projects_isolation(client, auth_headers, auth_headers_user_2):
     # User 1 creates a project
     client.post("/api/v1/projects", json={"name": "User1 Project"}, headers=auth_headers)
-    
+
     # User 2 creates a project
     client.post("/api/v1/projects", json={"name": "User2 Project"}, headers=auth_headers_user_2)
 
@@ -45,7 +42,10 @@ def test_project_authorization_boundary_view(client, auth_headers, auth_headers_
     # User 2 attempts to view User 1's project -> 403 Forbidden
     res_forbidden = client.get(f"/api/v1/projects/{project_id}", headers=auth_headers_user_2)
     assert res_forbidden.status_code == 403
-    assert "permission" in res_forbidden.json()["detail"].lower() or "forbidden" in res_forbidden.json()["detail"].lower()
+    assert (
+        "permission" in res_forbidden.json()["detail"].lower()
+        or "forbidden" in res_forbidden.json()["detail"].lower()
+    )
 
 
 def test_project_authorization_boundary_update(client, auth_headers, auth_headers_user_2):
@@ -55,9 +55,7 @@ def test_project_authorization_boundary_update(client, auth_headers, auth_header
 
     # User 2 attempts to update User 1's project -> 403 Forbidden
     res_forbidden = client.patch(
-        f"/api/v1/projects/{project_id}",
-        json={"name": "Hacked Name"},
-        headers=auth_headers_user_2
+        f"/api/v1/projects/{project_id}", json={"name": "Hacked Name"}, headers=auth_headers_user_2
     )
     assert res_forbidden.status_code == 403
 

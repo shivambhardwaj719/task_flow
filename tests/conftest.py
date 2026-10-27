@@ -1,19 +1,20 @@
 import os
+
 os.environ["ENVIRONMENT"] = "testing"
 os.environ["USE_SQLITE_FALLBACK"] = "True"
 
-import pytest
 from typing import Generator
+
+import fakeredis
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.pool import StaticPool
-import fakeredis
+from sqlalchemy.orm import Session, sessionmaker
 
+from app.core.security import create_access_token, hash_password
 from app.database import Base, get_db
 from app.main import app
-from app.core.security import hash_password, create_access_token
-from app.models import User, Project, Task, Notification
+from app.models import User
 from app.workers.celery_app import celery_app
 
 celery_app.conf.update(
@@ -26,10 +27,7 @@ celery_app.conf.update(
 # Shared SQLite file for tests so FastAPI routes and worker tasks share the same state
 TEST_DATABASE_URL = "sqlite:///./test_taskflow.db"
 
-test_engine = create_engine(
-    TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False}
-)
+test_engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
 
@@ -55,9 +53,10 @@ def fake_redis_client(monkeypatch):
     """Fixture providing a fakeredis instance to intercept Redis calls in tests."""
     server = fakeredis.FakeServer()
     fake_client = fakeredis.FakeRedis(server=server, decode_responses=True)
-    
+
     # Patch get_redis_client in cache module
     import app.core.cache as cache_module
+
     monkeypatch.setattr(cache_module, "get_redis_client", lambda: fake_client)
     monkeypatch.setattr(cache_module, "_redis_client", fake_client)
     return fake_client
@@ -66,6 +65,7 @@ def fake_redis_client(monkeypatch):
 @pytest.fixture
 def client(db_session: Session) -> Generator[TestClient, None, None]:
     """Test client overriding the get_db dependency with test database session."""
+
     def override_get_db():
         try:
             yield db_session
@@ -85,7 +85,7 @@ def test_user(db_session: Session) -> User:
         email="testuser@example.com",
         username="testuser",
         hashed_password=hash_password("Password123!"),
-        is_active=True
+        is_active=True,
     )
     db_session.add(user)
     db_session.commit()
@@ -100,7 +100,7 @@ def test_user_2(db_session: Session) -> User:
         email="otheruser@example.com",
         username="otheruser",
         hashed_password=hash_password("Password456!"),
-        is_active=True
+        is_active=True,
     )
     db_session.add(user)
     db_session.commit()

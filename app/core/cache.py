@@ -1,8 +1,10 @@
+import hashlib
 import json
 import logging
-import hashlib
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, List, Optional
+
 import redis
+
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -16,9 +18,7 @@ def get_redis_client() -> Optional[redis.Redis]:
     if _redis_client is None:
         try:
             _redis_client = redis.Redis.from_url(
-                settings.REDIS_URL,
-                decode_responses=True,
-                socket_timeout=2.0
+                settings.REDIS_URL, decode_responses=True, socket_timeout=2.0
             )
             _redis_client.ping()
         except Exception as e:
@@ -29,7 +29,7 @@ def get_redis_client() -> Optional[redis.Redis]:
 
 class TaskCacheManager:
     """Manages Redis caching for tasks using a Versioned Namespace Pattern.
-    
+
     Guarantees:
     - O(1) invalidation time with zero race conditions.
     - Stale reads are mathematically impossible because any write/mutation
@@ -50,11 +50,7 @@ class TaskCacheManager:
             return 1
 
     @classmethod
-    def generate_cache_key(
-        cls,
-        user_id: int,
-        params: Dict[str, Any]
-    ) -> Optional[str]:
+    def generate_cache_key(cls, user_id: int, params: Dict[str, Any]) -> Optional[str]:
         """Generate a deterministic versioned cache key for task queries."""
         r = get_redis_client()
         if not r:
@@ -92,10 +88,7 @@ class TaskCacheManager:
 
     @classmethod
     def set_cached_tasks(
-        cls,
-        cache_key: Optional[str],
-        data: Dict[str, Any],
-        ttl_seconds: Optional[int] = None
+        cls, cache_key: Optional[str], data: Dict[str, Any], ttl_seconds: Optional[int] = None
     ) -> None:
         """Store serialized task query results in Redis with TTL."""
         if not cache_key:
@@ -113,7 +106,7 @@ class TaskCacheManager:
     @classmethod
     def invalidate_user_tasks_cache(cls, user_ids: List[int]) -> None:
         """Atomically invalidate all task caches for one or more users.
-        
+
         Called on task creation, status update, reassignment, and deletion.
         """
         r = get_redis_client()
@@ -132,7 +125,7 @@ class TaskCacheManager:
                 logger.info(
                     "Cache INVALIDATED for user_id=%d (new version: %d). Stale reads prevented.",
                     uid,
-                    new_version
+                    new_version,
                 )
             except Exception as e:
                 logger.warning("Failed to invalidate cache for user_id %d: %s", uid, str(e))

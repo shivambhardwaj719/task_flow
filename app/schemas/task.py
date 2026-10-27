@@ -1,13 +1,17 @@
 from datetime import datetime
-from typing import Optional, List
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from typing import List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
+
 from app.models.task import TaskStatus
 
 
 class TaskBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=255, description="Task title")
     description: Optional[str] = Field(None, description="Detailed task description")
-    status: TaskStatus = Field(default=TaskStatus.TODO, description="Task status: todo, in_progress, done")
+    status: TaskStatus = Field(
+        default=TaskStatus.TODO, description="Task status: todo, in_progress, done"
+    )
     due_date: Optional[datetime] = Field(None, description="Task due date/time with UTC timezone")
 
 

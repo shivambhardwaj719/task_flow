@@ -1,16 +1,18 @@
 import logging
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.config import settings
+
 from app.api.v1 import api_v1_router
 from app.api.v1.operational import router as operational_router
-from app.database import Base, engine
+from app.config import settings
 from app.core.metrics import PrometheusMetricsMiddleware
+from app.database import Base, engine
 
 logging.basicConfig(
     level=logging.INFO if not settings.DEBUG else logging.DEBUG,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger("taskflow")
 
@@ -26,7 +28,7 @@ async def lifespan(app: FastAPI):
                 "%s v%s started up successfully in %s mode.",
                 settings.PROJECT_NAME,
                 settings.VERSION,
-                settings.ENVIRONMENT
+                settings.ENVIRONMENT,
             )
         except Exception as e:
             logger.warning("Startup table initialization skipped or failed: %s", str(e))
@@ -41,7 +43,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # Prometheus Metrics Middleware
@@ -70,5 +72,5 @@ def root():
         "docs": "/docs",
         "health": "/health",
         "metrics": "/metrics",
-        "version": settings.VERSION
+        "version": settings.VERSION,
     }

@@ -1,4 +1,3 @@
-import pytest
 from app.models.user import User
 
 
@@ -6,7 +5,7 @@ def test_signup_success(client, db_session):
     payload = {
         "email": "newuser@example.com",
         "username": "newuser",
-        "password": "SecurePassword123!"
+        "password": "SecurePassword123!",
     }
     response = client.post("/api/v1/auth/signup", json=payload)
     assert response.status_code == 201
@@ -25,11 +24,7 @@ def test_signup_success(client, db_session):
 
 
 def test_signup_duplicate_email(client, test_user):
-    payload = {
-        "email": test_user.email,
-        "username": "uniqueusername",
-        "password": "Password123!"
-    }
+    payload = {"email": test_user.email, "username": "uniqueusername", "password": "Password123!"}
     response = client.post("/api/v1/auth/signup", json=payload)
     assert response.status_code == 400
     assert "email" in response.json()["detail"].lower()
@@ -39,7 +34,7 @@ def test_signup_duplicate_username(client, test_user):
     payload = {
         "email": "different@example.com",
         "username": test_user.username,
-        "password": "Password123!"
+        "password": "Password123!",
     }
     response = client.post("/api/v1/auth/signup", json=payload)
     assert response.status_code == 400
@@ -47,20 +42,13 @@ def test_signup_duplicate_username(client, test_user):
 
 
 def test_signup_validation_short_password(client):
-    payload = {
-        "email": "short@example.com",
-        "username": "shortpass",
-        "password": "123"
-    }
+    payload = {"email": "short@example.com", "username": "shortpass", "password": "123"}
     response = client.post("/api/v1/auth/signup", json=payload)
     assert response.status_code == 422
 
 
 def test_login_success(client, test_user):
-    payload = {
-        "username_or_email": test_user.email,
-        "password": "Password123!"
-    }
+    payload = {"username_or_email": test_user.email, "password": "Password123!"}
     response = client.post("/api/v1/auth/login", json=payload)
     assert response.status_code == 200
     data = response.json()
@@ -71,19 +59,13 @@ def test_login_success(client, test_user):
 
 
 def test_login_invalid_password(client, test_user):
-    payload = {
-        "username_or_email": test_user.email,
-        "password": "WrongPassword!"
-    }
+    payload = {"username_or_email": test_user.email, "password": "WrongPassword!"}
     response = client.post("/api/v1/auth/login", json=payload)
     assert response.status_code == 401
 
 
 def test_login_nonexistent_user(client):
-    payload = {
-        "username_or_email": "nobody@example.com",
-        "password": "Password123!"
-    }
+    payload = {"username_or_email": "nobody@example.com", "password": "Password123!"}
     response = client.post("/api/v1/auth/login", json=payload)
     assert response.status_code == 401
 

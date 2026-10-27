@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserBase(BaseModel):
@@ -9,7 +10,12 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    password: str = Field(..., min_length=6, max_length=128, description="Plaintext password, will be hashed with bcrypt")
+    password: str = Field(
+        ...,
+        min_length=6,
+        max_length=128,
+        description="Plaintext password, will be hashed with bcrypt",
+    )
 
 
 class UserLogin(BaseModel):
