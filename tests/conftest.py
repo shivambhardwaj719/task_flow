@@ -14,6 +14,14 @@ from app.database import Base, get_db
 from app.main import app
 from app.core.security import hash_password, create_access_token
 from app.models.user import User
+from app.workers.celery_app import celery_app
+
+celery_app.conf.update(
+    broker_url="memory://",
+    result_backend="cache+memory://",
+    task_always_eager=True,
+    task_eager_propagates=True,
+)
 
 # In-memory SQLite engine for tests with StaticPool so all threads share same memory
 TEST_DATABASE_URL = "sqlite:///:memory:"
@@ -43,7 +51,7 @@ def db_session() -> Generator[Session, None, None]:
         session.close()
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def fake_redis_client(monkeypatch):
     """Fixture providing a fakeredis instance to intercept Redis calls in tests."""
     server = fakeredis.FakeServer()
@@ -52,6 +60,7 @@ def fake_redis_client(monkeypatch):
     # Patch get_redis_client in cache module
     import app.core.cache as cache_module
     monkeypatch.setattr(cache_module, "get_redis_client", lambda: fake_client)
+    monkeypatch.setattr(cache_module, "_redis_client", fake_client)
     return fake_client
 
 
